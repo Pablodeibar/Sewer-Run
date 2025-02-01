@@ -2,7 +2,7 @@
 
 **Sewer Run** is a fast-paced endless runner built with [A-Frame](https://aframe.io/), set in an underground sewer system. Dodge obstacles, avoid dangers, and see how far you can go before getting caught!
 
-[![Play Now on Glitch](https://sewer-run.glitch.me/)](#)  
+[![Play Now on Glitch](https://img.shields.io/badge/Play%20Now-Glitch-blue?style=for-the-badge&logo=glitch)](https://sewer-run.glitch.me/)
 
 ---
 
@@ -47,8 +47,7 @@
 No installation needed!  
 Click the button below to try **Sewer Run** instantly:
 
-[![Play on Glitch](https://sewer-run.glitch.me/)](#)  
-
+[![Play Now on Glitch](https://img.shields.io/badge/Play%20Now-Glitch-blue?style=for-the-badge&logo=glitch)](https://sewer-run.glitch.me/)
 ---
 
 ## 🏗️ Features
