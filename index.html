@@ -1,0 +1,308 @@
+<html>
+
+<head>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.4/dist/aframe-extras.min.js"></script>
+    <script src="moves.js"></script>
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+    <!-- Menu Overlay -->
+    <div id="menu">
+        <h2>Welcome to the Game!</h2>
+        <p><strong>Rules:</strong></p>
+        <ul>
+            <li>Use <strong>Q</strong> and <strong>D</strong> to move your character.</li>
+            <li>The camera will switch the view randomly.</li>
+            <li>Use <strong>W</strong> to jump over the rats and <strong>S</strong> to slide under the pipes</li>
+            <li>Switch between different camera views by pressing <strong>G</strong> (2D platformer) or
+                <strong>R</strong> (basic view).
+            </li>
+            <li>To return to the third-person view, press <strong>R</strong> or <strong>G</strong> again.</li>
+            <li>Avoid obstacles and survive as long as you can!</li>
+        </ul>
+        <button id="play-button">Play</button>
+    </div>
+
+    <!-- Game Overlay -->
+    <div id="loose-menu" style="display: none;">
+        <h2>Game Over</h2>
+        <p>Your final score: <span id="final-score"></span></p>
+        <button id="restart-button">Restart</button>
+        <button id="main-menu-button">Main Menu</button>
+    </div>
+
+    <a-scene>
+        <!-- Assets -->
+        <a-assets>
+            <img id="env01"
+                src="https://cdn.glitch.global/fb42b970-08a7-45fd-ace1-2b1e2f46c1d3/Herne_Wanne_Tunnel_07_Panorama%20(1).jpg?v=1737481387913" />
+            <a-asset-item id="obstacle-model"
+                src="https://cdn.glitch.global/fb42b970-08a7-45fd-ace1-2b1e2f46c1d3/rat_animated.glb?v=1737380265353"></a-asset-item>
+            <a-asset-item id="side-obstacle-model"
+                src="https://cdn.glitch.global/fb42b970-08a7-45fd-ace1-2b1e2f46c1d3/runescape_cave_horror.glb?v=1737131836885"></a-asset-item>
+            <a-asset-item id="corridor-model"
+                src="https://cdn.glitch.global/fb42b970-08a7-45fd-ace1-2b1e2f46c1d3/dungeon_ground_texture.glb?v=1737537871625"></a-asset-item>
+            <audio id="background-music"
+                src="https://cdn.glitch.global/fb42b970-08a7-45fd-ace1-2b1e2f46c1d3/Temple%20Run%20(iOS)%20Music-%20Running%20Music.mp3?v=1737550439636"
+                loop="true"></audio>
+            <audio id="death-sound"
+                src="https://cdn.glitch.global/fb42b970-08a7-45fd-ace1-2b1e2f46c1d3/Moai%20sound.mp3.mp3?v=1737551795057"></audio>
+            <audio id="monkey-sound"
+                src="https://cdn.glitch.global/fb42b970-08a7-45fd-ace1-2b1e2f46c1d3/Monkey%20-%20Sound%20Effect.mp3?v=1737552037192"
+                preload="auto"></audio>
+            <audio id="slidable-death-sound"
+                src="https://cdn.glitch.global/fb42b970-08a7-45fd-ace1-2b1e2f46c1d3/Metal%20pipe%20falling%20sound%20effect%20but%20its%20more%20violent.mp3?v=1737552473234"
+                preload="auto"></audio>
+        </a-assets>
+
+        <!-- Ground -->
+        <a-plane id="ground" position="0 0 -4" rotation="-90 0 0" width="10" height="200" color="#7BC8A4"></a-plane>
+
+        <!-- Player -->
+        <a-entity id="player" position="0 1.6 0">
+            <a-entity id="player-box"
+                gltf-model="https://cdn.glitch.global/fb42b970-08a7-45fd-ace1-2b1e2f46c1d3/male_running_20_frames_loop.glb?v=1737118448676"
+                position="0 0 0" rotation="0 180 0" animation-mixer="clip: Take 001; loop: repeat;"></a-entity>
+        </a-entity>
+
+        <!-- Camera (third-person view) -->
+        <a-entity id="camera" camera position="0 5 5" look-controls></a-entity>
+
+        <a-entity id="scooby"
+            gltf-model="https://cdn.glitch.me/fb42b970-08a7-45fd-ace1-2b1e2f46c1d3/scooby_doo.glb?v=1737532679991"
+            position="100 0 140" scale=" 10 10 10" rotation="0 50 0"
+            animation-mixer="clip: Fantasmas - Tembleque; loop: repeat;"></a-entity>
+
+        <!-- Corridors -->
+        <a-entity id="corridors">
+            <a-entity class="corridor" gltf-model="#corridor-model" position="0 0.5 -50" scale="3 4 14"></a-entity>
+        </a-entity>
+
+        <!-- Sky -->
+        <a-sky src="#env01"></a-sky>
+
+        <!-- Obstacles -->
+        <a-entity id="obstacles"></a-entity>
+
+        <!-- Score Display -->
+        <a-text id="score-display" value="Score: 0" position="-5 3 -3" color="white" width="4"></a-text>
+
+        <a-sound src="#background-music" autoplay="true" volume="0.5" position="0 2 -10"></a-sound>
+
+        <script>
+            const lanes = [-4, 0, 4];
+            let currentLane = 1;
+            const player = document.getElementById("player");
+            const camera = document.getElementById("camera");
+            const obstacles = document.getElementById("obstacles");
+            const scoreDisplay = document.getElementById("score-display");
+            let gameStarted = false;
+            let score = 0;
+            let scoreInterval;
+            let isJumping = false;
+            let isSliding = false;
+            let obstacleSpeed = 0.1;
+            const obstacleSpeedIncrement = 0.01;
+            let lastObstacleZ = -10;
+            const minObstacleSpacing = 10;
+
+            function updateCameraPosition() {
+                if (isPlatformerView) {
+                    return;
+                }
+                const playerPosition = player.object3D.position;
+                camera.setAttribute(
+                    "position",
+                    `${playerPosition.x} 5 ${playerPosition.z + 5}`
+                );
+            }
+
+            function updatePlayerPosition() {
+                const newX = lanes[currentLane];
+                const playerPosition = player.object3D.position;
+                player.setAttribute("position", `${newX} ${playerPosition.y} ${playerPosition.z}`);
+                updateCameraPosition();
+            }
+
+            function repositionObstacle(obstacle) {
+                const laneIndex = Math.floor(Math.random() * 3);
+                const obstacleType = Math.random() > 0.5 ? "jump" : "slide";
+
+                const newObstacleZ = Math.min(lastObstacleZ - minObstacleSpacing, -Math.random() * 30 - 10);
+                lastObstacleZ = newObstacleZ; // Update the last obstacle's position
+
+                if (obstacleType === "jump") {
+                    obstacle.setAttribute(
+                        "gltf-model",
+                        "https://cdn.glitch.global/fb42b970-08a7-45fd-ace1-2b1e2f46c1d3/rat_animated.glb?v=1737380265353"
+                    );
+                    obstacle.setAttribute("position", `${lanes[laneIndex]} 1.6 ${newObstacleZ}`);
+                    obstacle.setAttribute("scale", "2 2 2");
+                    obstacle.setAttribute("rotation", "0 90 0");
+                    obstacle.setAttribute("animation-mixer", "clip: Run; loop: repeat;");
+                    obstacle.setAttribute("data-type", "jump");
+                } else {
+                    obstacle.setAttribute(
+                        "gltf-model",
+                        "https://cdn.glitch.global/fb42b970-08a7-45fd-ace1-2b1e2f46c1d3/concrete_pipe_game_ready.glb?v=1737383235324"
+                    );
+                    obstacle.setAttribute("position", `${lanes[laneIndex]} 4 ${newObstacleZ}`);
+                    obstacle.setAttribute("scale", "2 2 2");
+                    obstacle.setAttribute("rotation", "0 90 0");
+                    obstacle.setAttribute("data-type", "slide");
+                }
+            }
+
+            function repositionSideObstacle(sideObstacle, isLeft) {
+                const laneX = isLeft ? -4 : 4;
+
+                const minZDistance = 10;
+                const maxZDistance = 30;
+                const randomZ = Math.random() * (maxZDistance - minZDistance) + minZDistance;
+
+                sideObstacle.setAttribute(
+                    "position",
+                    `${laneX} 1.6 ${-randomZ}`
+                );
+                sideObstacle.setAttribute("gltf-model", "#side-obstacle-model");
+                sideObstacle.setAttribute("scale", "1.5 1.5 1.5");
+                sideObstacle.setAttribute("rotation", "0 180 0");
+                sideObstacle.setAttribute("animation-mixer", "clip: walk; loop: repeat;");
+            }
+
+            function moveEnvironment() {
+                const obstacleElements = document.querySelectorAll(".obstacle");
+                const sideObstacleElements = document.querySelectorAll(".side-obstacle");
+
+                obstacleElements.forEach((obstacle) => {
+                    const obstaclePosition = obstacle.object3D.position;
+                    obstaclePosition.z += obstacleSpeed;
+
+                    if (obstaclePosition.z > 1) {
+                        repositionObstacle(obstacle);
+                    }
+                });
+
+                sideObstacleElements.forEach((sideObstacle) => {
+                    const sideObstaclePosition = sideObstacle.object3D.position;
+                    sideObstaclePosition.z += obstacleSpeed;
+
+                    if (sideObstaclePosition.z > 1) {
+                        if (Math.random() > 0.7) {
+                            const isLeft = sideObstaclePosition.x === -4;
+                            repositionSideObstacle(sideObstacle, isLeft);
+                        } else {
+                            const isLeft = sideObstaclePosition.x === 4;
+                            repositionSideObstacle(sideObstacle, isLeft);
+                        }
+                    }
+                });
+            }
+
+            function createObstacles() {
+                const maxObstacles = 20;
+
+                for (let i = 0; i < maxObstacles; i++) {
+                    const obstacle = document.createElement("a-entity");
+                    repositionObstacle(obstacle);
+                    obstacle.setAttribute("class", "obstacle");
+                    obstacles.appendChild(obstacle);
+                }
+
+                if (Math.random() > 0.3) {
+                    const leftSideObstacle = document.createElement("a-entity");
+                    repositionSideObstacle(leftSideObstacle, true);
+                    leftSideObstacle.setAttribute("class", "side-obstacle");
+                    obstacles.appendChild(leftSideObstacle);
+                }
+
+                if (Math.random() > 0.3) {
+                    const rightSideObstacle = document.createElement("a-entity");
+                    repositionSideObstacle(rightSideObstacle, false);
+                    rightSideObstacle.setAttribute("class", "side-obstacle");
+                    obstacles.appendChild(rightSideObstacle);
+                }
+            }
+
+            function gameOver() {
+                gameStarted = false;
+                clearInterval(scoreInterval);
+                document.getElementById("final-score").textContent = score;
+                document.getElementById("loose-menu").style.display = "block";
+                const deathSound = document.getElementById('death-sound');
+                deathSound.play();
+            }
+
+            function resetGame() {
+                player.setAttribute("position", "0 1.6 0");
+                currentLane = 1;
+                obstacles.innerHTML = "";
+                createObstacles();
+                score = 0;
+                scoreDisplay.setAttribute("value", `Score: ${score}`);
+                gameStarted = false;
+                obstacleSpeed = 0.1;
+                lastObstacleZ = -10;
+                document.getElementById("loose-menu").style.display = "none";
+            }
+
+            document.getElementById("restart-button").addEventListener("click", () => {
+                resetGame();
+                document.getElementById("menu").style.display = "block";
+                createObstacles();
+            });
+
+            document.getElementById("main-menu-button").addEventListener("click", () => {
+                resetGame();
+                document.getElementById("menu").style.display = "block";
+                document.getElementById("game-over-menu").style.display = "none";
+            });
+
+            function playMonkeySound() {
+                const monkeySound = document.getElementById("monkey-sound");
+
+                setInterval(() => {
+                    monkeySound.play();
+                }, Math.random() * 10000 + 20000);
+            }
+
+            function startScoreIncrement() {
+                clearInterval(scoreInterval);
+                scoreInterval = setInterval(() => {
+                    score++;
+                    scoreDisplay.setAttribute("value", `Score: ${score}`);
+                    if (score % 1000 === 0) obstacleSpeed += obstacleSpeedIncrement;
+                }, 10);
+            }
+
+            function animate() {
+                if (gameStarted) {
+                    moveEnvironment();
+                    detectCollision();
+                    requestAnimationFrame(animate);
+                }
+            }
+
+            document.getElementById("play-button").addEventListener("click", () => {
+                gameStarted = true;
+                document.getElementById("menu").style.display = "none";
+                document.getElementById("loose-menu").style.display = "none";
+                startScoreIncrement();
+                animate();
+
+                setTimeout(() => {
+                    const sound = document.getElementById('background-music');
+                    sound.play();
+                }, 200);
+                playMonkeySound();
+                randomCameraSwitch();
+            });
+
+            createObstacles();
+        </script>
+    </a-scene>
+</body>
+
+</html>
