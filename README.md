@@ -63,5 +63,5 @@ Click the button below to try **Sewer Run** instantly:
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/yourusername/sewer-run.git
+   git clone https://github.com/Pablodeibar/Sewer-Run.git
     ```
